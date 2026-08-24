@@ -85,9 +85,15 @@ _Run workflow_) and opens a pull request whenever upstream published a new relea
 guards against the assets and the regex drifting apart, so the pull request only needs a version
 bump and a changelog entry before publishing.
 
+Twemoji releases are rare enough that this repository can sit without a commit for months, and
+GitHub disables scheduled workflows in public repositories after 60 days without one. The workflow
+therefore pushes an empty `chore: keep the Twemoji sync schedule alive` commit to the default branch
+whenever the last commit is more than 50 days old, so the schedule survives quiet periods.
+
 > The workflow pushes with the built-in `GITHUB_TOKEN`, which requires
 > _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ to be
-> enabled for the repository.
+> enabled for the repository. In a forked repository, Actions also have to be enabled once before
+> any scheduled run happens.
 
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)

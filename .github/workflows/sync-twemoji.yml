@@ -120,3 +120,30 @@ jobs:
             --head "$BRANCH" \
             --title "chore: sync Twemoji assets with jdecked/twemoji $REF" \
             --body-file "$RUNNER_TEMP/pr-body.md"
+
+  # GitHub disables scheduled workflows in public repositories once the
+  # repository has seen no commit for 60 days, and Twemoji releases are rarer
+  # than that. Pushing an occasional empty commit to the default branch keeps
+  # this workflow on its schedule. Only commits reset that timer -- opening
+  # pull requests or pushing the sync branch does not.
+  keepalive:
+    needs: sync
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refresh repository activity
+        env:
+          MAX_IDLE_DAYS: '50'
+        run: |
+          set -euo pipefail
+          idle_days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          if [ "$idle_days" -lt "$MAX_IDLE_DAYS" ]; then
+            echo "Last commit on $GITHUB_REF_NAME was $idle_days days ago, nothing to do"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --allow-empty -m 'chore: keep the Twemoji sync schedule alive'
+          git push origin "HEAD:$GITHUB_REF_NAME"
