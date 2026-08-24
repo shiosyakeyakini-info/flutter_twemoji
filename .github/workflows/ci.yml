@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter pub get
+
+      # Infos (deprecations, line length) are not treated as failures, the
+      # analyzer still fails the job on warnings and errors.
+      - run: flutter analyze --no-fatal-infos
+
+      # Verifies that the bundled assets and the generated emoji regex belong
+      # to the same Twemoji release.
+      - run: flutter test
