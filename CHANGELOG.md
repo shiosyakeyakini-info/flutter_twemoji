@@ -4,7 +4,7 @@
 - Upgraded to Twemoji 17.0.3 (Unicode 17 emoji)
 - Regenerated the emoji regex from `@twemoji/parser`, so newly added emoji are recognized by `TwemojiText` as well
 - Added `twemojiVersion`/`twemojiSourceRepository` constants
-- Added `tool/sync_twemoji.sh` and a weekly GitHub Actions workflow that opens a pull request whenever upstream publishes a new release
+- Added `tool/sync_twemoji.sh` and a GitHub Actions workflow that syncs with an upstream release on demand and opens a pull request with the result
 
 # 1.1.0
 

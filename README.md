@@ -78,22 +78,20 @@ the release in `lib/src/twemoji_version.dart`, and regenerates `TwemojiUtils.emo
 [`@twemoji/parser`](https://www.npmjs.com/package/@twemoji/parser) package Twemoji itself builds its
 distribution from. Regenerating the regex needs Node.js; pass `--skip-regex` to sync only the assets.
 
-### Syncing automatically
+### Syncing from the Actions tab
 
-`.github/workflows/sync-twemoji.yml` runs the same script every Monday (and on demand via
-_Run workflow_) and opens a pull request whenever upstream published a new release. `flutter test`
+`.github/workflows/sync-twemoji.yml` runs the same script on _Actions → Sync Twemoji → Run
+workflow_, optionally pinned to a tag, and opens a pull request with the result. `flutter test`
 guards against the assets and the regex drifting apart, so the pull request only needs a version
 bump and a changelog entry before publishing.
 
-Twemoji releases are rare enough that this repository can sit without a commit for months, and
-GitHub disables scheduled workflows in public repositories after 60 days without one. The workflow
-therefore pushes an empty `chore: keep the Twemoji sync schedule alive` commit to the default branch
-whenever the last commit is more than 50 days old, so the schedule survives quiet periods.
+The workflow is deliberately manual: upstream publishes a release a few times a year, and GitHub
+disables scheduled workflows in public repositories after 60 days without a commit, which this
+repository would regularly exceed.
 
 > The workflow pushes with the built-in `GITHUB_TOKEN`, which requires
 > _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ to be
-> enabled for the repository. In a forked repository, Actions also have to be enabled once before
-> any scheduled run happens.
+> enabled for the repository.
 
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)
