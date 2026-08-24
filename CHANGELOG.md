@@ -1,3 +1,11 @@
+# 1.2.0
+
+- Switched the Twemoji assets to [jdecked/twemoji](https://github.com/jdecked/twemoji), the actively maintained successor of twitter/twemoji
+- Upgraded to Twemoji 17.0.3 (Unicode 17 emoji)
+- Regenerated the emoji regex from `@twemoji/parser`, so newly added emoji are recognized by `TwemojiText` as well
+- Added `twemojiVersion`/`twemojiSourceRepository` constants
+- Added `tool/sync_twemoji.sh` and a GitHub Actions workflow that syncs with an upstream release on demand and opens a pull request with the result
+
 # 1.1.0
 
 - Use Discord's fork of twemoji
