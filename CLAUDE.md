@@ -7,6 +7,10 @@ Twemoji assets track [jdecked/twemoji](https://github.com/jdecked/twemoji), the 
 following Unicode now that twitter/twemoji is dormant. The Flutter widget layer is upstream's; what
 this fork adds is the tooling that keeps the assets and the emoji regex current.
 
+It is maintained for Misskey clients. The API is not Misskey-specific, but where a choice had to be
+made it went to how a Misskey server hands emoji out — which is why the emoji regex comes from
+`@misskey-dev/emoji-data` (see 絵文字正規表現の出どころ below) rather than from `@twemoji/parser`.
+
 ## Commands
 
 ```bash

@@ -5,6 +5,14 @@ successor of the now-dormant [twitter/twemoji](https://github.com/twitter/twemoj
 A fork of [jasonlessenich/flutter_twemoji](https://github.com/jasonlessenich/flutter_twemoji) that
 follows upstream Twemoji releases automatically.
 
+**This fork is maintained for Misskey clients.** Nothing here is Misskey-specific in its API — it
+renders any emoji — but where a choice had to be made, it was made for how a Misskey server hands
+emoji out. The emoji regex comes from [`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis)
+rather than `@twemoji/parser`, so emoji stripped of the U+FE0F variation selector (Misskey drops it
+in `ReactionService.normalize` before storing a reaction) still match instead of rendering as an
+invisible gap. See [絵文字の照合と異体字セレクタ](#絵文字の照合と異体字セレクタ) for what that
+covers and what it costs.
+
 <img src="https://raw.githubusercontent.com/shiosyakeyakini-info/flutter_twemoji/main/art/1.png" width=270>
 
 ## Usage
@@ -96,6 +104,8 @@ repository would regularly exceed.
 
 ## 絵文字の照合と異体字セレクタ
 
+このフォークが Misskey 向けだというのは、要するにこの節のことである。
+
 `Twemoji`・`TwemojiText`・`TwemojiTextSpan` は、どこからどこまでが絵文字かを
 `TwemojiUtils.emojiRegex` で判定する。この正規表現は sync が
 [`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) から生成している。Twemoji の
@@ -117,6 +127,12 @@ repository would regularly exceed.
 （[#16](https://github.com/jdecked/twemoji-parser/issues/16)、未修正）。Unicode 17.0 の絵文字1915字で
 測ると描画できないものが141字あり、生成元を切り替えて1字（`👁️‍🗨️`、アセット名の付き方が別問題）まで
 減らした。測定と経緯は `CLAUDE.md` にある。
+
+代わりに背負ったものもある。`@misskey-dev/emoji-data` の README には「ほかのプロダクトで使用される
+ことは想定していません」と明記されており、上流のサポートは期待できない。バージョンも Twemoji の
+リリースとは独立に動く。そのため sync は、生成した正規表現が上の3点を満たしているか確かめてからで
+ないと書き込まない（`tool/update_emoji_regex.mjs`）。同じ3点は `flutter test` でも押さえてある。
+なお正規表現部分のライセンスは `@twemoji/parser` 由来の MIT で、そこは切り替え前後で変わらない。
 
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)
