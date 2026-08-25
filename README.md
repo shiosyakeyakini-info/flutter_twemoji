@@ -128,6 +128,29 @@ repository would regularly exceed.
 測ると描画できないものが141字あり、生成元を切り替えて1字（`👁️‍🗨️`、アセット名の付き方が別問題）まで
 減らした。測定と経緯は `CLAUDE.md` にある。
 
+### 上流の経緯
+
+この節の内容は、上流のやりとりをそのままなぞっている。
+
+| 番号 | 種別・状態 | 日付 | 内容 |
+|---|---|---|---|
+| [twemoji-parser#10](https://github.com/jdecked/twemoji-parser/pull/10) | PR（jdecked）・マージ済 | 2026-03-31 | `fix: Eye in speech bubble must now be fully-qualified`。`👁️‍🗨️` が完全修飾必須になった経緯（#9、[twemoji#151](https://github.com/jdecked/twemoji/issues/151)） |
+| [twemoji-parser#11](https://github.com/jdecked/twemoji-parser/pull/11) | PR（jasmussen）・未マージで close | 2026-05-22 | 斜め矢印 U+2196–2199 の完全修飾化。より広く直す #12 に置き換えられた |
+| [twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) | PR（jdecked）・マージ済 | 2026-06-01 | `fix: All Emoji_Presentation=No characters are now text-default type, not variant`。FE0F 必須化の張本人。同日 17.0.2 として公開 |
+| [twemoji-parser#13](https://github.com/jdecked/twemoji-parser/issues/13) | issue（kakkokari-gtyih）・not planned で close | 2026-06-18 起票 | `Provide old (prior to 17.0.2) emoji matching behavior as option`。Misskey は VS16 の有無に関わらず Twemoji が対応する文字を全部描画する設計で、既定を戻せとは言っていない。却下 |
+| [twemoji-parser#15](https://github.com/jdecked/twemoji-parser/issues/15) | issue（mxz7）・close | 2026-06-28 | `failed to parse '🏛'`。#12 の余波の同種報告 |
+| [misskey-dev/emojis#9](https://github.com/misskey-dev/emojis/pull/9) | PR（kakkokari-gtyih）・マージ済 | 2026-06-28 | `fix: 絵文字正規表現を自前で生成するように`。#13 の起票から10日、上流待ちをやめて自前生成へ移った。いまこのフォークが使っている正規表現の正体 |
+| [twemoji-parser#14](https://github.com/jdecked/twemoji-parser/pull/14) | PR（kakkokari-gtyih）・作者取り下げ | 2026-06-28 起票 → 07-19 close | 正規表現ジェネレータの TypeScript 化。却下ではなく「#2 を読み違えた、実際の目標は JS+Flow だった」と作者自身が引き上げた |
+| [twemoji-parser#16](https://github.com/jdecked/twemoji-parser/issues/16) | issue（jdecked）・open、PR なし | 2026-07-07 起票 | `Text default diversity emoji do not parse correctly`。対象は 1f590 270d 1f575 1f574 26f7 1f3cb 26f9 1f3cc 270c 261d の10字で、上の一覧と完全に一致する。原因は `emoji.yml` の `text-default,diversity` タグの扱い |
+
+ここから言えること:
+
+1. **FE0F 必須は仕様変更であって不具合ではない。** 上流は Unicode 的に正しい側に倒し、互換オプションの要望（#13）は not planned で閉じられた。待っていても戻ってこない。
+2. **10字の取りこぼしは本物の不具合で、上流も認識している（#16）。** ただしメンテナ自身の起票で、PR はなく、動きがない。近いうちに直る前提では組めない。
+3. **Misskey はすでに自前生成へ移った（emojis#9）。** Misskey クライアント向けのこのフォークが同じ正規表現に揃えるのは、測定結果（141字 → 1字）だけでなく足並みの点でも素直な選択になる。
+
+なお `@twemoji/parser` の最新リリースは 17.0.2（2026-06-01）で、Twemoji 本体 17.0.3 に対応するパーサのリリースはない。アセットとパーサがバージョンで揃うという前提自体、すでに崩れている。
+
 代わりに背負ったものもある。`@misskey-dev/emoji-data` の README には「ほかのプロダクトで使用される
 ことは想定していません」と明記されており、上流のサポートは期待できない。バージョンも Twemoji の
 リリースとは独立に動く。そのため sync は、生成した正規表現が上の3点を満たしているか確かめてからで

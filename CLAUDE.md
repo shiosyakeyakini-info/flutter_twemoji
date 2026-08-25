@@ -54,7 +54,7 @@ Twemoji's. `--data-version` pins an exact one.
 **2026-08 に生成元を `@twemoji/parser` から `@misskey-dev/emoji-data/regex` に切り替えた。**
 以下はその経緯と、切り替え時に測った数字である。
 
-上流で起きたことを順に:
+上流で起きたことを順に（一覧は README の「上流の経緯」にある）:
 
 - 2026-06-01 — [jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) が
   `Emoji_Presentation=No` の文字をすべてテキスト既定に変更。パーサ 17.0.2 で公開され、これらの
