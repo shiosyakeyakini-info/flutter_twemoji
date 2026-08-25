@@ -93,6 +93,33 @@ repository would regularly exceed.
 > _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ to be
 > enabled for the repository.
 
+## Emoji matching and the variation selector
+
+`Twemoji`, `TwemojiText` and `TwemojiTextSpan` all decide what counts as an emoji with
+`TwemojiUtils.emojiRegex`, which the sync generates from `@twemoji/parser`. Since parser 17.0.2
+([jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12), merged 2026-06-01)
+every character whose Unicode property is `Emoji_Presentation=No` is text by default, so the regex
+matches it only when a variation selector U+FE0F follows: `☹️` is an emoji, a bare `☹` is not.
+`Twemoji` renders nothing for input the regex does not match, so an emoji it misses disappears
+instead of falling back to the system font.
+
+This matters for anything that takes emoji from a server rather than from a keyboard. Misskey, for
+one, strips U+FE0F from reactions before storing them (`ReactionService.normalize`), so its clients
+receive the bare form, which this regex does not match.
+
+Ten emoji are missed even when fully qualified — ☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌, the text-default emoji
+that also take skin tones. That is
+[jdecked/twemoji-parser#16](https://github.com/jdecked/twemoji-parser/issues/16), open upstream with
+no fix yet: `parse('✌️')` returns the variation selector alone.
+
+Misskey hit the same change, asked upstream to keep the old behaviour available
+([#13](https://github.com/jdecked/twemoji-parser/issues/13), closed as not planned) and now
+generates its own regex from Twemoji's `emoji.yml`, published as
+[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis). That regex leaves U+FE0F
+optional while still declining U+FE0E, the explicit request for text presentation, and it covers
+those ten. `CLAUDE.md` records the measurements behind this section and what switching the
+generator's source would involve.
+
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)
 - Continued as `flutter_twemoji` by [jasonlessenich](https://github.com/jasonlessenich/flutter_twemoji)

@@ -34,6 +34,60 @@ unmatched by `TwemojiText`, and `flutter test` fails when the two drift apart. T
 in a Dart string that resolves the `\uXXXX` escapes before `RegExp` sees them, so the generator
 rejects any upstream pattern that would need different escaping rather than emitting broken Dart.
 
+## Where the regex comes from, and why that is a live decision
+
+The assets and the regex come from different places, and only the assets are uncontroversial.
+Between upstream `flutter_twemoji` 1.1.0 and this fork the asset set is purely additive (+163 files,
+none removed), so anything that regressed came from the regex.
+
+What happened upstream, in order:
+
+- 2026-06-01 — [jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) makes
+  every `Emoji_Presentation=No` character text-default. Released in parser 17.0.2: the regex now
+  matches those characters only when U+FE0F follows. Before this, the generated pattern carried
+  `(?:\uFE0F|(?!\uFE0E))` after the text-default groups, which is why 1.1.0 matched a bare `☹`.
+- 2026-06-18 — Misskey asks for the old behaviour as an option
+  ([#13](https://github.com/jdecked/twemoji-parser/issues/13)); closed as not planned.
+- 2026-06-28 — Misskey generates its own regex from Twemoji's `emoji.yml` instead
+  ([misskey-dev/emojis#9](https://github.com/misskey-dev/emojis/pull/9)), shipped as
+  `@misskey-dev/emoji-data/regex`.
+- 2026-07-07 — [#16](https://github.com/jdecked/twemoji-parser/issues/16), filed by the parser's own
+  maintainer: the ten text-default emoji that also take skin tones (261d 270c 270d 1f574 1f575 1f590
+  26f7 26f9 1f3cb 1f3cc) do not parse at all, qualified or not. Open, no pull request.
+
+Measured against the 1915 Unicode emoji Misskey ships (`@misskey-dev/emoji-data` 17.0.3), resolved
+exactly the way `Twemoji` does — run the regex, take `toUnicode` of the match, look for that asset:
+
+| regex | unrenderable |
+|---|---|
+| this fork (`@twemoji/parser` 17.0.2) | 141 = 130 needing U+FE0F + 10 from #16 + `👁️‍🗨️` |
+| upstream 1.1.0 (old `twitter/twemoji-parser`) | 14 Unicode 16/17 emoji its older regex never learned, 7 of which 1.1.0 already shipped an asset for |
+| `@misskey-dev/emoji-data` 17.0.3 | 0 |
+
+`👁️‍🗨️` is separate: the asset is `1f441-200d-1f5e8.svg`, while `toUnicode` keeps U+FE0F whenever a
+ZWJ is present, so the name never matches. Upstream requires the fully qualified form deliberately
+([#10](https://github.com/jdecked/twemoji-parser/pull/10)).
+
+Two things to know before trying to patch the pattern by hand:
+
+- Making every U+FE0F optional breaks the regex completely. The pattern ends in a lone `|\uFE0F`
+  alternative; rewrite that one too and the alternative matches the empty string, so `splitMapJoin`
+  finds zero-width matches everywhere and every emoji resolves to `''`.
+- Leaving that tail alone gets 141 down to 11, but the ten from #16 are missing from the pattern
+  outright rather than gated on U+FE0F, so no textual substitution reaches them.
+
+So the honest options are to keep generating from `@twemoji/parser` and accept the gap, to generate
+from `@misskey-dev/emoji-data/regex` instead (a Misskey-flavoured source, but it is the same
+`emoji.yml` reinterpreted, and it declines U+FE0E correctly), or to reimplement that generator here.
+Nothing has been decided; the sync still generates from `@twemoji/parser`.
+
+Independently of the regex, `Twemoji.build` returns `SizedBox.shrink()` when the pattern does not
+match, which is why a miss is an invisible gap rather than a fallback glyph. A resolver that tried
+the input, then the input plus U+FE0F, then the bare code points — checked against a generated
+manifest of the bundled asset names — would cover all 1915 including `👁️‍🗨️`. Misskey's own client
+skips the regex entirely for single emoji (`char2twemojiFilePath`: code points, drop U+FE0F unless a
+ZWJ is present).
+
 ## Layout
 
 - `lib/src/twemoji_widget.dart` — `Twemoji`, a single emoji as an SVG or 72x72 PNG asset
