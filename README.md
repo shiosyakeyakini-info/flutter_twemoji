@@ -93,32 +93,31 @@ repository would regularly exceed.
 > _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ to be
 > enabled for the repository.
 
-## Emoji matching and the variation selector
+## 絵文字の照合と異体字セレクタ
 
-`Twemoji`, `TwemojiText` and `TwemojiTextSpan` all decide what counts as an emoji with
-`TwemojiUtils.emojiRegex`, which the sync generates from `@twemoji/parser`. Since parser 17.0.2
-([jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12), merged 2026-06-01)
-every character whose Unicode property is `Emoji_Presentation=No` is text by default, so the regex
-matches it only when a variation selector U+FE0F follows: `☹️` is an emoji, a bare `☹` is not.
-`Twemoji` renders nothing for input the regex does not match, so an emoji it misses disappears
-instead of falling back to the system font.
+`Twemoji`・`TwemojiText`・`TwemojiTextSpan` は、どこからどこまでが絵文字かを
+`TwemojiUtils.emojiRegex` で判定する。この正規表現は sync が `@twemoji/parser` から生成している。
+パーサ 17.0.2（[jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12)、
+2026-06-01 マージ）以降、Unicode 特性が `Emoji_Presentation=No` の文字は既定でテキスト扱いになり、
+異体字セレクタ U+FE0F が続くときしかマッチしない。`☹️` は絵文字だが、素の `☹` はそうではない。
+`Twemoji` はマッチしない入力に対して**何も描画しない**ので、取りこぼした絵文字はシステムフォントに
+フォールバックせず、そのまま消える。
 
-This matters for anything that takes emoji from a server rather than from a keyboard. Misskey, for
-one, strips U+FE0F from reactions before storing them (`ReactionService.normalize`), so its clients
-receive the bare form, which this regex does not match.
+これはキーボードからではなくサーバーから絵文字を受け取る用途で効いてくる。たとえば Misskey は
+リアクションを保存する前に U+FE0F を落とす（`ReactionService.normalize`）ため、クライアントには
+素の形が届き、この正規表現ではマッチしない。
 
-Ten emoji are missed even when fully qualified — ☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌, the text-default emoji
-that also take skin tones. That is
-[jdecked/twemoji-parser#16](https://github.com/jdecked/twemoji-parser/issues/16), open upstream with
-no fix yet: `parse('✌️')` returns the variation selector alone.
+完全修飾しても取りこぼす絵文字が10字ある。☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌 ── テキスト表示が既定で、かつ
+肌の色を取れる絵文字である。上流の
+[jdecked/twemoji-parser#16](https://github.com/jdecked/twemoji-parser/issues/16) として未修正のまま
+開いている（`parse('✌️')` は異体字セレクタだけを返す）。
 
-Misskey hit the same change, asked upstream to keep the old behaviour available
-([#13](https://github.com/jdecked/twemoji-parser/issues/13), closed as not planned) and now
-generates its own regex from Twemoji's `emoji.yml`, published as
-[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis). That regex leaves U+FE0F
-optional while still declining U+FE0E, the explicit request for text presentation, and it covers
-those ten. `CLAUDE.md` records the measurements behind this section and what switching the
-generator's source would involve.
+Misskey も同じ変更にぶつかり、以前の挙動を選べるようにしてほしいと要望したが
+（[#13](https://github.com/jdecked/twemoji-parser/issues/13)、not planned で終了）、いまは Twemoji の
+`emoji.yml` から自前で正規表現を生成し、
+[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) として公開している。そちらは
+U+FE0F を任意にしつつ、テキスト表示の明示的な指定である U+FE0E はきちんと拒み、上記の10字も含む。
+この節の根拠にした実測と、生成元を切り替える場合の話は `CLAUDE.md` にある。
 
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)

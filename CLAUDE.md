@@ -34,59 +34,58 @@ unmatched by `TwemojiText`, and `flutter test` fails when the two drift apart. T
 in a Dart string that resolves the `\uXXXX` escapes before `RegExp` sees them, so the generator
 rejects any upstream pattern that would need different escaping rather than emitting broken Dart.
 
-## Where the regex comes from, and why that is a live decision
+## 絵文字正規表現の出どころ（まだ決まっていない話）
 
-The assets and the regex come from different places, and only the assets are uncontroversial.
-Between upstream `flutter_twemoji` 1.1.0 and this fork the asset set is purely additive (+163 files,
-none removed), so anything that regressed came from the regex.
+アセットと正規表現は別々のところから来ていて、揉めるのは正規表現のほうだけである。本家
+`flutter_twemoji` 1.1.0 とこのフォークとでアセットは純増（+163ファイル、削除ゼロ）なので、
+壊れたものがあるとすれば原因は正規表現にしかない。
 
-What happened upstream, in order:
+上流で起きたことを順に:
 
-- 2026-06-01 — [jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) makes
-  every `Emoji_Presentation=No` character text-default. Released in parser 17.0.2: the regex now
-  matches those characters only when U+FE0F follows. Before this, the generated pattern carried
-  `(?:\uFE0F|(?!\uFE0E))` after the text-default groups, which is why 1.1.0 matched a bare `☹`.
-- 2026-06-18 — Misskey asks for the old behaviour as an option
-  ([#13](https://github.com/jdecked/twemoji-parser/issues/13)); closed as not planned.
-- 2026-06-28 — Misskey generates its own regex from Twemoji's `emoji.yml` instead
-  ([misskey-dev/emojis#9](https://github.com/misskey-dev/emojis/pull/9)), shipped as
-  `@misskey-dev/emoji-data/regex`.
-- 2026-07-07 — [#16](https://github.com/jdecked/twemoji-parser/issues/16), filed by the parser's own
-  maintainer: the ten text-default emoji that also take skin tones (261d 270c 270d 1f574 1f575 1f590
-  26f7 26f9 1f3cb 1f3cc) do not parse at all, qualified or not. Open, no pull request.
+- 2026-06-01 — [jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) が
+  `Emoji_Presentation=No` の文字をすべてテキスト既定に変更。パーサ 17.0.2 で公開され、これらの
+  文字は U+FE0F が続くときしかマッチしなくなった。それ以前の生成物はテキスト既定のグループの
+  後ろに `(?:\uFE0F|(?!\uFE0E))` を付けており、1.1.0 が素の `☹` を拾えていたのはそのため。
+- 2026-06-18 — Misskey が以前の挙動を選択肢として残すよう要望
+  （[#13](https://github.com/jdecked/twemoji-parser/issues/13)）。not planned で終了。
+- 2026-06-28 — Misskey は代わりに Twemoji の `emoji.yml` から自前で正規表現を生成する道を選ぶ
+  （[misskey-dev/emojis#9](https://github.com/misskey-dev/emojis/pull/9)）。
+  `@misskey-dev/emoji-data/regex` として公開されている。
+- 2026-07-07 — [#16](https://github.com/jdecked/twemoji-parser/issues/16)。パーサのメンテナ自身が
+  立てたもので、テキスト既定かつ肌の色を取れる10字（261d 270c 270d 1f574 1f575 1f590 26f7 26f9
+  1f3cb 1f3cc）が完全修飾してもまったくマッチしない、という内容。未修正、PR もなし。
 
-Measured against the 1915 Unicode emoji Misskey ships (`@misskey-dev/emoji-data` 17.0.3), resolved
-exactly the way `Twemoji` does — run the regex, take `toUnicode` of the match, look for that asset:
+Misskey が配っている Unicode 絵文字1915字（`@misskey-dev/emoji-data` 17.0.3）に対して、`Twemoji`
+とまったく同じ手順（正規表現にかけ、一致部分を `toUnicode` に通し、そのアセットを探す）で数えた結果:
 
-| regex | unrenderable |
+| 正規表現 | 描画できない数 |
 |---|---|
-| this fork (`@twemoji/parser` 17.0.2) | 141 = 130 needing U+FE0F + 10 from #16 + `👁️‍🗨️` |
-| upstream 1.1.0 (old `twitter/twemoji-parser`) | 14 Unicode 16/17 emoji its older regex never learned, 7 of which 1.1.0 already shipped an asset for |
+| このフォーク（`@twemoji/parser` 17.0.2） | 141 = U+FE0F 待ちの130 + #16 の10 + `👁️‍🗨️` |
+| 本家 1.1.0（旧 `twitter/twemoji-parser`） | 古い正規表現が知らない Unicode 16/17 の14字。うち7字は 1.1.0 の時点でアセットは同梱されていた |
 | `@misskey-dev/emoji-data` 17.0.3 | 0 |
 
-`👁️‍🗨️` is separate: the asset is `1f441-200d-1f5e8.svg`, while `toUnicode` keeps U+FE0F whenever a
-ZWJ is present, so the name never matches. Upstream requires the fully qualified form deliberately
-([#10](https://github.com/jdecked/twemoji-parser/pull/10)).
+`👁️‍🗨️` だけは別件で、アセット名が `1f441-200d-1f5e8.svg` なのに対し `toUnicode` は ZWJ がある
+ときは U+FE0F を残すため、名前が一致しない。上流が完全修飾を要求しているのは意図的
+（[#10](https://github.com/jdecked/twemoji-parser/pull/10)）。
 
-Two things to know before trying to patch the pattern by hand:
+パターンを手で直そうとする前に知っておくべきことが2つある:
 
-- Making every U+FE0F optional breaks the regex completely. The pattern ends in a lone `|\uFE0F`
-  alternative; rewrite that one too and the alternative matches the empty string, so `splitMapJoin`
-  finds zero-width matches everywhere and every emoji resolves to `''`.
-- Leaving that tail alone gets 141 down to 11, but the ten from #16 are missing from the pattern
-  outright rather than gated on U+FE0F, so no textual substitution reaches them.
+- U+FE0F をすべて任意にすると正規表現ごと壊れる。パターンの末尾は `|\uFE0F` という単独の選択肢に
+  なっていて、そこまで書き換えると空文字にマッチする選択肢ができ、`splitMapJoin` が至るところで
+  幅ゼロの一致を拾って、どの絵文字も `''` に解決されてしまう。
+- 末尾を残せば141は11まで減るが、#16 の10字は U+FE0F の有無で制御されているのではなく、そもそも
+  パターンに存在しない。文字列置換では届かない。
 
-So the honest options are to keep generating from `@twemoji/parser` and accept the gap, to generate
-from `@misskey-dev/emoji-data/regex` instead (a Misskey-flavoured source, but it is the same
-`emoji.yml` reinterpreted, and it declines U+FE0E correctly), or to reimplement that generator here.
-Nothing has been decided; the sync still generates from `@twemoji/parser`.
+したがって取り得る道は、`@twemoji/parser` から生成し続けてこの穴を許容するか、
+`@misskey-dev/emoji-data/regex` から生成するか（Misskey 色は付くが、出どころは同じ `emoji.yml` の
+解釈違いで、U+FE0E もきちんと拒む）、そのジェネレータをここで書き直すか、のいずれかになる。
+**まだ何も決めていない。sync はいまも `@twemoji/parser` から生成している。**
 
-Independently of the regex, `Twemoji.build` returns `SizedBox.shrink()` when the pattern does not
-match, which is why a miss is an invisible gap rather than a fallback glyph. A resolver that tried
-the input, then the input plus U+FE0F, then the bare code points — checked against a generated
-manifest of the bundled asset names — would cover all 1915 including `👁️‍🗨️`. Misskey's own client
-skips the regex entirely for single emoji (`char2twemojiFilePath`: code points, drop U+FE0F unless a
-ZWJ is present).
+正規表現とは別の話として、`Twemoji.build` はパターンが一致しないと `SizedBox.shrink()` を返す。
+取りこぼしが代替グリフではなく見えない隙間になるのはこのためである。入力そのもの → 入力 + U+FE0F
+→ 素のコードポイント、の順に試し、同梱アセット名の一覧（生成する）と突き合わせる解決器にすれば、
+`👁️‍🗨️` を含めて1915字すべてを賄える。本家 Misskey のクライアントは単体の絵文字に正規表現を
+使っていない（`char2twemojiFilePath`: コードポイントを並べ、ZWJ がなければ U+FE0F を落とす）。
 
 ## Layout
 
