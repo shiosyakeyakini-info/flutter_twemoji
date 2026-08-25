@@ -1,3 +1,10 @@
+# Unreleased
+
+- Generate `TwemojiUtils.emojiRegex` from [`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) instead of `@twemoji/parser`
+- Emoji now match without the U+FE0F variation selector, so emoji coming from servers that normalize it away (Misskey stores reactions that way) are rendered instead of silently dropped
+- Emoji whose default presentation is text now match with a skin tone as well (☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌, unmatched by `@twemoji/parser`, see jdecked/twemoji-parser#16)
+- U+FE0E, the explicit request for a text rendering, is still not matched
+
 # 1.2.0
 
 - Switched the Twemoji assets to [jdecked/twemoji](https://github.com/jdecked/twemoji), the actively maintained successor of twitter/twemoji

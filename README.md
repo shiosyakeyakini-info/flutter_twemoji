@@ -74,9 +74,10 @@ tool/sync_twemoji.sh --print-current
 ```
 
 The script replaces `assets/png` and `assets/svg` with the upstream `72x72` PNGs and SVGs, records
-the release in `lib/src/twemoji_version.dart`, and regenerates `TwemojiUtils.emojiRegex` from the
-[`@twemoji/parser`](https://www.npmjs.com/package/@twemoji/parser) package Twemoji itself builds its
-distribution from. Regenerating the regex needs Node.js; pass `--skip-regex` to sync only the assets.
+the release in `lib/src/twemoji_version.dart`, and regenerates `TwemojiUtils.emojiRegex` from
+[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis), which builds its pattern from
+Twemoji's own `emoji.yml`. Regenerating the regex needs Node.js; pass `--skip-regex` to sync only
+the assets.
 
 ### Syncing from the Actions tab
 
@@ -96,30 +97,29 @@ repository would regularly exceed.
 ## 絵文字の照合と異体字セレクタ
 
 `Twemoji`・`TwemojiText`・`TwemojiTextSpan` は、どこからどこまでが絵文字かを
-`TwemojiUtils.emojiRegex` で判定する。この正規表現は sync が `@twemoji/parser` から生成している。
-パーサ 17.0.2（[jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12)、
-2026-06-01 マージ）以降、Unicode 特性が `Emoji_Presentation=No` の文字は既定でテキスト扱いになり、
-異体字セレクタ U+FE0F が続くときしかマッチしない。`☹️` は絵文字だが、素の `☹` はそうではない。
-`Twemoji` はマッチしない入力に対して**何も描画しない**ので、取りこぼした絵文字はシステムフォントに
-フォールバックせず、そのまま消える。
+`TwemojiUtils.emojiRegex` で判定する。この正規表現は sync が
+[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) から生成している。Twemoji の
+`emoji.yml` から起こしたもので、次のように振る舞う。
+
+- 異体字セレクタ U+FE0F は任意。`☹️` でも素の `☹` でもマッチする。
+- テキスト表示を明示する U+FE0E は拒む。`☹︎` はマッチしない。
+- テキスト表示が既定で、かつ肌の色を取れる絵文字（☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌）も肌の色つきでマッチする。
 
 これはキーボードからではなくサーバーから絵文字を受け取る用途で効いてくる。たとえば Misskey は
 リアクションを保存する前に U+FE0F を落とす（`ReactionService.normalize`）ため、クライアントには
-素の形が届き、この正規表現ではマッチしない。
+素の形が届く。`Twemoji` はマッチしない入力に対して**何も描画しない**ので、取りこぼした絵文字は
+システムフォントにフォールバックせず、そのまま消える。
 
-完全修飾しても取りこぼす絵文字が10字ある。☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌 ── テキスト表示が既定で、かつ
-肌の色を取れる絵文字である。上流の
-[jdecked/twemoji-parser#16](https://github.com/jdecked/twemoji-parser/issues/16) として未修正のまま
-開いている（`parse('✌️')` は異体字セレクタだけを返す）。
-
-Misskey も同じ変更にぶつかり、以前の挙動を選べるようにしてほしいと要望したが
-（[#13](https://github.com/jdecked/twemoji-parser/issues/13)、not planned で終了）、いまは Twemoji の
-`emoji.yml` から自前で正規表現を生成し、
-[`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) として公開している。そちらは
-U+FE0F を任意にしつつ、テキスト表示の明示的な指定である U+FE0E はきちんと拒み、上記の10字も含む。
-この節の根拠にした実測と、生成元を切り替える場合の話は `CLAUDE.md` にある。
+以前は Twemoji 自身が使う [`@twemoji/parser`](https://www.npmjs.com/package/@twemoji/parser) から
+生成していたが、パーサ 17.0.2（[jdecked/twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12)、
+2026-06-01 マージ）以降、Unicode 特性が `Emoji_Presentation=No` の文字は U+FE0F が続くときしか
+マッチしなくなり、さらに上の10字は完全修飾してもマッチしない
+（[#16](https://github.com/jdecked/twemoji-parser/issues/16)、未修正）。Unicode 17.0 の絵文字1915字で
+測ると描画できないものが141字あり、生成元を切り替えて1字（`👁️‍🗨️`、アセット名の付き方が別問題）まで
+減らした。測定と経緯は `CLAUDE.md` にある。
 
 ## Credits
 - Originally maintained by [hadi-codes](https://github.com/hadi-codes/twemoji)
 - Continued as `flutter_twemoji` by [jasonlessenich](https://github.com/jasonlessenich/flutter_twemoji)
 - Twemoji graphics by [jdecked/twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0)
+- Emoji regex from [`@misskey-dev/emoji-data`](https://github.com/misskey-dev/emojis) (MIT)

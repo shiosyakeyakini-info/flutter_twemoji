@@ -133,6 +133,8 @@ echo "Synced $png_count PNGs and $svg_count SVGs from Twemoji $ref"
 
 if [ "$skip_regex" -eq 0 ]; then
   command -v node > /dev/null || die "node is required to regenerate the emoji regex (use --skip-regex to skip)"
+  # The regex comes from `@misskey-dev/emoji-data`, not from the clone above:
+  # see the header of tool/update_emoji_regex.mjs for why.
   node "$root_dir/tool/update_emoji_regex.mjs" --twemoji-version "$version"
 fi
 

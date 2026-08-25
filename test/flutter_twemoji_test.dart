@@ -13,6 +13,42 @@ const _recentEmojis = <String>[
   '\u{1FAEF}', // Apple core (Unicode 17.0)
 ];
 
+/// Emoji whose default presentation is text, so a server that normalizes the
+/// variation selector away (Misskey does, before storing a reaction) hands
+/// them to the client unqualified. `@twemoji/parser` stopped matching those in
+/// 17.0.2, which is why the regex is generated from `@misskey-dev/emoji-data`
+/// instead.
+const _unqualifiedEmojis = <String>[
+  '\u2639', // Frowning face
+  '\u2764', // Red heart
+  '\u270C', // Victory hand
+  '\u{1F575}', // Detective
+];
+
+/// Text-default emoji that can take a skin tone. `@twemoji/parser` matches
+/// none of these, not even fully qualified — jdecked/twemoji-parser#16, still
+/// open upstream.
+const _tonedTextDefaultEmojis = <String>[
+  '\u261D\u{1F3FB}', // Index pointing up
+  '\u270C\u{1F3FC}', // Victory hand
+  '\u270D\u{1F3FD}', // Writing hand
+  '\u{1F574}\u{1F3FE}', // Person in suit levitating
+  '\u{1F575}\u{1F3FF}', // Detective
+  '\u{1F590}\u{1F3FB}', // Hand with fingers splayed
+  '\u26F7\u{1F3FC}', // Skier
+  '\u26F9\u{1F3FD}', // Person bouncing ball
+  '\u{1F3CB}\u{1F3FE}', // Person lifting weights
+  '\u{1F3CC}\u{1F3FF}', // Person golfing
+];
+
+/// Whether [emoji] is matched as a whole, rather than partly or not at all.
+/// A partial match is as broken as none: [Twemoji] renders the match and drops
+/// whatever it did not consume.
+bool _matchesWhole(String emoji) {
+  final match = TwemojiUtils.emojiRegex.firstMatch(emoji);
+  return match != null && match.group(0) == emoji;
+}
+
 Set<String> _assetNames(String directory, String extension) =>
     Directory(directory)
         .listSync()
@@ -50,13 +86,43 @@ void main() {
     test('does not match plain text', () {
       expect(TwemojiUtils.emojiRegex.hasMatch('Flutter is awesome'), isFalse);
     });
+
+    test('matches text-default emoji without the variation selector', () {
+      for (final emoji in _unqualifiedEmojis) {
+        expect(_matchesWhole(emoji), isTrue,
+            reason: 'regex does not match bare '
+                '${TwemojiUtils.toUnicode(emoji)}');
+        expect(_matchesWhole('$emoji\uFE0F'), isTrue,
+            reason: 'regex does not match qualified '
+                '${TwemojiUtils.toUnicode(emoji)}');
+      }
+    });
+
+    test('matches text-default emoji with a skin tone', () {
+      for (final emoji in _tonedTextDefaultEmojis) {
+        expect(_matchesWhole(emoji), isTrue,
+            reason: 'regex does not match ${TwemojiUtils.toUnicode(emoji)}');
+      }
+    });
+
+    test('does not match emoji asked to render as text', () {
+      for (final emoji in _unqualifiedEmojis) {
+        expect(TwemojiUtils.emojiRegex.hasMatch('$emoji\uFE0E'), isFalse,
+            reason: 'regex matches ${TwemojiUtils.toUnicode(emoji)} + U+FE0E');
+      }
+    });
   });
 
   group('toUnicode', () {
     test('resolves to bundled asset file names', () {
       const others = ['🍕', '👍🏽', '👨‍👩‍👧‍👦', '🇩🇪'];
 
-      for (final emoji in [..._recentEmojis, ...others]) {
+      for (final emoji in [
+        ..._recentEmojis,
+        ..._unqualifiedEmojis,
+        ..._tonedTextDefaultEmojis,
+        ...others,
+      ]) {
         final unicode = TwemojiUtils.toUnicode(emoji);
 
         expect(File('assets/png/$unicode.png').existsSync(), isTrue,

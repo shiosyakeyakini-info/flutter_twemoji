@@ -88,7 +88,8 @@ jobs:
           VERSION: ${{ steps.target.outputs.version }}
           PNG_COUNT: ${{ steps.sync.outputs.png_count }}
           SVG_COUNT: ${{ steps.sync.outputs.svg_count }}
-          PARSER_VERSION: ${{ steps.sync.outputs.parser_version }}
+          REGEX_PACKAGE: ${{ steps.sync.outputs.regex_package }}
+          REGEX_VERSION: ${{ steps.sync.outputs.regex_version }}
         run: |
           set -euo pipefail
           existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')"
@@ -103,7 +104,7 @@ jobs:
             echo "| --- | --- |"
             echo "| Bundled Twemoji | \`$CURRENT\` -> \`$VERSION\` |"
             echo "| Assets | $PNG_COUNT PNGs, $SVG_COUNT SVGs |"
-            echo "| Emoji regex | generated from \`@twemoji/parser\` v$PARSER_VERSION |"
+            echo "| Emoji regex | generated from \`$REGEX_PACKAGE\` v$REGEX_VERSION |"
             echo
             echo "Upstream changes: https://github.com/jdecked/twemoji/compare/v$CURRENT...$REF"
             echo

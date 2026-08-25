@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // Regenerates `TwemojiUtils.emojiRegex` in lib/src/utils.dart from the
-// `@twemoji/parser` npm package, which is the same source jdecked/twemoji
-// itself uses to build its `twemoji.js` distribution.
+// `@misskey-dev/emoji-data` npm package, which generates its pattern from
+// Twemoji's own `emoji.yml` — the same source `@twemoji/parser` is built from,
+// but with U+FE0F kept optional (while U+FE0E is still rejected) and without
+// the missing skin-tone alternatives of jdecked/twemoji-parser#16.
 //
 // Usage:
 //   node tool/update_emoji_regex.mjs [options]
 //
 //   --twemoji-version <x.y.z>   Twemoji release the assets were synced from.
-//                               The newest parser release that is not newer
-//                               than this version is used.
-//   --parser-version <x.y.z>    Pin an exact `@twemoji/parser` version.
+//                               The newest emoji-data release of the same
+//                               major.minor series is used.
+//   --data-version <x.y.z>      Pin an exact `@misskey-dev/emoji-data` version.
 //   --file <path>               Dart file to patch (default lib/src/utils.dart).
 
 import {execFileSync} from 'node:child_process';
@@ -19,7 +21,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const PACKAGE = '@twemoji/parser';
+const PACKAGE = '@misskey-dev/emoji-data';
+const ENTRY_POINT = `${PACKAGE}/regex`;
 const BEGIN = '  // twemoji-regex:begin';
 const END = '  // twemoji-regex:end';
 
@@ -36,7 +39,7 @@ function parseArgs(argv) {
     };
     switch (arg) {
       case '--twemoji-version': opts.twemojiVersion = next().replace(/^v/, ''); break;
-      case '--parser-version': opts.parserVersion = next().replace(/^v/, ''); break;
+      case '--data-version': opts.dataVersion = next().replace(/^v/, ''); break;
       case '--file': opts.file = path.resolve(rootDir, next()); break;
       case '-h':
       case '--help': opts.help = true; break;
@@ -61,31 +64,44 @@ function npm(args, options = {}) {
   return execFileSync('npm', args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], ...options});
 }
 
-/// Picks the newest published parser release that is not newer than the
-/// Twemoji release we synced the assets from. The parser is versioned in
-/// lockstep with Twemoji, but its patch releases can lag behind.
-function resolveParserVersion(twemojiVersion) {
+/// Picks the newest emoji-data release covering the same emoji set as the
+/// Twemoji release the assets came from.
+///
+/// Only major.minor is matched: those track the Unicode/Twemoji generation
+/// (17.0 for Twemoji 17.0.x), while the patch number is the package's own
+/// revision and moves independently of Twemoji's. Picking the newest release
+/// that is not newer than the Twemoji version — which is what we did while the
+/// regex came from `@twemoji/parser`, whose releases are in lockstep with
+/// Twemoji's — would pin a stale pattern here: emoji-data 17.0.3 still shipped
+/// a copy of the old parser regex, and only 17.0.5 switched to the generated
+/// one this fork is after.
+function resolveDataVersion(twemojiVersion) {
   const versions = JSON.parse(npm(['view', PACKAGE, 'versions', '--json']));
   const stable = versions.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort(compareVersions);
   if (stable.length === 0) throw new Error(`No stable ${PACKAGE} releases found`);
-  if (!twemojiVersion) return stable[stable.length - 1];
-  const candidates = stable.filter((v) => compareVersions(v, twemojiVersion) <= 0);
+  const newest = stable[stable.length - 1];
+  if (!twemojiVersion) return newest;
+  const series = twemojiVersion.split('.').slice(0, 2);
+  const candidates = stable.filter((v) => {
+    const parts = v.split('.');
+    return parts[0] === series[0] && parts[1] === series[1];
+  });
   if (candidates.length === 0) {
-    console.warn(`No ${PACKAGE} release <= ${twemojiVersion}; falling back to ${stable[stable.length - 1]}`);
-    return stable[stable.length - 1];
+    console.warn(`No ${PACKAGE} release in the ${series.join('.')}.x series; falling back to ${newest}`);
+    return newest;
   }
   return candidates[candidates.length - 1];
 }
 
-function readRegexSource(parserVersion) {
-  const installDir = mkdtempSync(path.join(tmpdir(), 'twemoji-parser-'));
+function readRegexSource(dataVersion) {
+  const installDir = mkdtempSync(path.join(tmpdir(), 'misskey-emoji-data-'));
   try {
     npm(['install', '--prefix', installDir, '--no-save', '--no-audit', '--no-fund', '--loglevel', 'error',
-      `${PACKAGE}@${parserVersion}`]);
+      `${PACKAGE}@${dataVersion}`]);
     const require = createRequire(path.join(installDir, 'noop.cjs'));
-    const regex = require(`${PACKAGE}/dist/lib/regex`).default;
-    if (!(regex instanceof RegExp)) throw new Error(`${PACKAGE} did not export a RegExp`);
-    return regex.source;
+    const {emojiRegex} = require(ENTRY_POINT);
+    if (!(emojiRegex instanceof RegExp)) throw new Error(`${ENTRY_POINT} did not export an emojiRegex RegExp`);
+    return emojiRegex.source;
   } finally {
     rmSync(installDir, {recursive: true, force: true});
   }
@@ -110,7 +126,42 @@ function assertEmbeddable(pattern) {
   new RegExp(JSON.parse(`"${pattern}"`));
 }
 
-function patch(file, pattern, parserVersion) {
+/// The properties this fork switched sources for. A release that loses one of
+/// them is a regression upstream, not something to commit and find out about
+/// through invisible gaps in rendered text.
+const MATCHES = [
+  ['☹', 'an unqualified text-default emoji'],
+  ['☹️', 'a fully qualified text-default emoji'],
+  ['☝🏻', 'a text-default emoji with a skin tone (twemoji-parser#16)'],
+  ['🏋️‍♀️', 'a fully qualified ZWJ sequence'],
+  ['😀', 'a plain emoji-default emoji'],
+  ['🇩🇪', 'a flag'],
+  ['👨‍👩‍👧‍👦', 'a family ZWJ sequence'],
+  ['1️⃣', 'a keycap'],
+];
+const NON_MATCHES = [
+  ['☹︎', 'an emoji explicitly asked to render as text'],
+  ['Flutter is awesome', 'plain text'],
+];
+
+function assertSane(pattern) {
+  const regex = new RegExp(JSON.parse(`"${pattern}"`), 'g');
+  for (const [input, what] of MATCHES) {
+    regex.lastIndex = 0;
+    const match = regex.exec(input);
+    if (match?.[0] !== input) {
+      throw new Error(`Upstream regex no longer matches ${what} (${JSON.stringify(input)})`);
+    }
+  }
+  for (const [input, what] of NON_MATCHES) {
+    regex.lastIndex = 0;
+    if (regex.test(input)) {
+      throw new Error(`Upstream regex now matches ${what} (${JSON.stringify(input)})`);
+    }
+  }
+}
+
+function patch(file, pattern, dataVersion) {
   const source = readFileSync(file, 'utf8');
   const begin = source.indexOf(BEGIN);
   const end = source.indexOf(END);
@@ -121,7 +172,12 @@ function patch(file, pattern, parserVersion) {
     `${BEGIN} (generated by tool/update_emoji_regex.mjs, do not edit)`,
     '  /// Matches every emoji sequence Twemoji ships an asset for.',
     '  ///',
-    `  /// Generated from \`${PACKAGE}\` v${parserVersion}.`,
+    '  /// U+FE0F is optional throughout, so emoji arriving unqualified — as they',
+    '  /// do from servers that normalize it away — still match; U+FE0E, the',
+    '  /// explicit request for a text rendering, does not.',
+    '  ///',
+    `  /// Generated from \`${PACKAGE}\` v${dataVersion}, which builds the`,
+    "  /// pattern from Twemoji's `emoji.yml`.",
     '  static final emojiRegex = RegExp(',
     '      // ignore: lines_longer_than_80_chars',
     `      '${pattern}');`,
@@ -136,20 +192,23 @@ function patch(file, pattern, parserVersion) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) {
-    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n')
-      .filter((l) => l.startsWith('//')).map((l) => l.slice(3)).join('\n'));
+    const lines = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1);
+    const banner = lines.slice(0, lines.findIndex((l) => !l.startsWith('//')));
+    console.log(banner.map((l) => l.slice(3)).join('\n'));
     return;
   }
-  const parserVersion = opts.parserVersion ?? resolveParserVersion(opts.twemojiVersion);
-  console.log(`Using ${PACKAGE}@${parserVersion}`);
-  const pattern = readRegexSource(parserVersion);
+  const dataVersion = opts.dataVersion ?? resolveDataVersion(opts.twemojiVersion);
+  console.log(`Using ${PACKAGE}@${dataVersion}`);
+  const pattern = readRegexSource(dataVersion);
   assertEmbeddable(pattern);
-  const changed = patch(opts.file, pattern, parserVersion);
+  assertSane(pattern);
+  const changed = patch(opts.file, pattern, dataVersion);
   console.log(changed
     ? `Updated the emoji regex in ${path.relative(rootDir, opts.file)} (${pattern.length} chars)`
     : `The emoji regex in ${path.relative(rootDir, opts.file)} is already up to date`);
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `parser_version=${parserVersion}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `regex_package=${PACKAGE}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `regex_version=${dataVersion}\n`);
   }
 }
 
