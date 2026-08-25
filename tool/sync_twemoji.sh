@@ -58,6 +58,27 @@ const String twemojiVersion = '$version';
 DART_EOF
 }
 
+# Twemoji names the eye-in-speech-bubble asset after the unqualified sequence
+# (1f441-200d-1f5e8), but `toUnicode` keeps U+FE0F inside ZWJ sequences and so
+# asks for 1f441-fe0f-200d-1f5e8-fe0f. Both spellings match the emoji regex, so
+# whichever one the input carries has to resolve; ship the asset under both
+# until upstream settles on one (jdecked/twemoji#151, open). The copy goes
+# whichever way the release happens to name it, so the fix survives that issue
+# being resolved either way. `@misskey-dev/emoji-assets` does the same.
+alias_eye_in_speech_bubble() {
+  local dir="$1" ext="$2"
+  local unqualified="$dir/1f441-200d-1f5e8.$ext"
+  local qualified="$dir/1f441-fe0f-200d-1f5e8-fe0f.$ext"
+
+  if [ -f "$unqualified" ] && [ ! -f "$qualified" ]; then
+    cp "$unqualified" "$qualified"
+  elif [ -f "$qualified" ] && [ ! -f "$unqualified" ]; then
+    cp "$qualified" "$unqualified"
+  elif [ ! -f "$unqualified" ]; then
+    echo "note: no eye-in-speech-bubble $ext asset to alias" >&2
+  fi
+}
+
 emit_output() {
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "$1=$2" >> "$GITHUB_OUTPUT"
@@ -127,9 +148,13 @@ mkdir -p "$assets_dir/png" "$assets_dir/svg"
 cp "$src_png"/*.png "$assets_dir/png/"
 cp "$src_svg"/*.svg "$assets_dir/svg/"
 
+alias_eye_in_speech_bubble "$assets_dir/png" png
+alias_eye_in_speech_bubble "$assets_dir/svg" svg
+
 write_version_file "$version"
 
 echo "Synced $png_count PNGs and $svg_count SVGs from Twemoji $ref"
+echo "Stored the eye in speech bubble under both of its file names"
 
 if [ "$skip_regex" -eq 0 ]; then
   command -v node > /dev/null || die "node is required to regenerate the emoji regex (use --skip-regex to skip)"

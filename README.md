@@ -125,8 +125,16 @@ repository would regularly exceed.
 2026-06-01 マージ）以降、Unicode 特性が `Emoji_Presentation=No` の文字は U+FE0F が続くときしか
 マッチしなくなり、さらに上の10字は完全修飾してもマッチしない
 （[#16](https://github.com/jdecked/twemoji-parser/issues/16)、未修正）。Unicode 17.0 の絵文字1915字で
-測ると描画できないものが141字あり、生成元を切り替えて1字（`👁️‍🗨️`、アセット名の付き方が別問題）まで
-減らした。測定と経緯は `CLAUDE.md` にある。
+測ると描画できないものが141字あった。生成元の切り替えで1字（`👁️‍🗨️`）まで減り、それは正規表現ではなく
+アセット名の問題だったので、sync で別名を置いて解消した（下記）。**いまは1915字すべて描画できる。**
+測定手順は `CLAUDE.md` にある。
+
+`👁️‍🗨️` だけ事情が違うのは、Twemoji のアセット名が `1f441-200d-1f5e8` なのに対し、`toUnicode` は ZWJ が
+あるとき U+FE0F を残すので `1f441-fe0f-200d-1f5e8-fe0f` を探しにいくためである。U+FE0F を残す名前
+（`1f3cb-fe0f-200d-2640-fe0f` など）のほうが多数派なので、`toUnicode` 側を一律に変えると他が壊れる。
+そこで `tool/sync_twemoji.sh` は、この1字だけアセットを両方の名前で置く。上流がどちらの名前に倒しても
+成り立つよう向きは判定しており、[jdecked/twemoji#151](https://github.com/jdecked/twemoji/issues/151) が
+決着するまでの措置である点も含めて、`@misskey-dev/emoji-assets` と同じやり方にしてある。
 
 ### 上流の経緯
 
@@ -134,6 +142,7 @@ repository would regularly exceed.
 
 | 番号 | 種別・状態 | 日付 | 内容 |
 |---|---|---|---|
+| [twemoji#151](https://github.com/jdecked/twemoji/issues/151) | issue（nicksellen）・open | 2025-12-23 起票 | `"eye in speech bubble" emoji not being mapped correctly to filename`。アセット名 `1f441-200d-1f5e8` と、コードポイントから導かれる `1f441-fe0f-200d-1f5e8-fe0f` が食い違う。未解決 |
 | [twemoji-parser#10](https://github.com/jdecked/twemoji-parser/pull/10) | PR（jdecked）・マージ済 | 2026-03-31 | `fix: Eye in speech bubble must now be fully-qualified`。`👁️‍🗨️` が完全修飾必須になった経緯（#9、[twemoji#151](https://github.com/jdecked/twemoji/issues/151)） |
 | [twemoji-parser#11](https://github.com/jdecked/twemoji-parser/pull/11) | PR（jasmussen）・未マージで close | 2026-05-22 | 斜め矢印 U+2196–2199 の完全修飾化。より広く直す #12 に置き換えられた |
 | [twemoji-parser#12](https://github.com/jdecked/twemoji-parser/pull/12) | PR（jdecked）・マージ済 | 2026-06-01 | `fix: All Emoji_Presentation=No characters are now text-default type, not variant`。FE0F 必須化の張本人。同日 17.0.2 として公開 |

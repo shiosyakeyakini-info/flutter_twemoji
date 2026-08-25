@@ -41,6 +41,15 @@ const _tonedTextDefaultEmojis = <String>[
   '\u{1F3CC}\u{1F3FF}', // Person golfing
 ];
 
+/// Both spellings of the eye in speech bubble. Twemoji names the asset after
+/// the unqualified sequence, while `toUnicode` keeps U+FE0F inside a ZWJ
+/// sequence and asks for the qualified one, so the sync stores the asset under
+/// both names until upstream settles on one (jdecked/twemoji#151).
+const _eyeInSpeechBubble = <String>[
+  '\u{1F441}\u200D\u{1F5E8}',
+  '\u{1F441}\uFE0F\u200D\u{1F5E8}\uFE0F',
+];
+
 /// Whether [emoji] is matched as a whole, rather than partly or not at all.
 /// A partial match is as broken as none: [Twemoji] renders the match and drops
 /// whatever it did not consume.
@@ -105,6 +114,13 @@ void main() {
       }
     });
 
+    test('matches both spellings of the eye in speech bubble', () {
+      for (final emoji in _eyeInSpeechBubble) {
+        expect(_matchesWhole(emoji), isTrue,
+            reason: 'regex does not match ${TwemojiUtils.toUnicode(emoji)}');
+      }
+    });
+
     test('does not match emoji asked to render as text', () {
       for (final emoji in _unqualifiedEmojis) {
         expect(TwemojiUtils.emojiRegex.hasMatch('$emoji\uFE0E'), isFalse,
@@ -121,6 +137,7 @@ void main() {
         ..._recentEmojis,
         ..._unqualifiedEmojis,
         ..._tonedTextDefaultEmojis,
+        ..._eyeInSpeechBubble,
         ...others,
       ]) {
         final unicode = TwemojiUtils.toUnicode(emoji);

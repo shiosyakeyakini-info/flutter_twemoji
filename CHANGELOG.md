@@ -4,6 +4,8 @@
 - Emoji now match without the U+FE0F variation selector, so emoji coming from servers that normalize it away (Misskey stores reactions that way) are rendered instead of silently dropped
 - Emoji whose default presentation is text now match with a skin tone as well (☝ ✌ ✍ 🖐 🕴 🕵 ⛷ ⛹ 🏋 🏌, unmatched by `@twemoji/parser`, see jdecked/twemoji-parser#16)
 - U+FE0E, the explicit request for a text rendering, is still not matched
+- Ship the eye in speech bubble under both of its file names, so `👁️‍🗨️` renders too (Twemoji names the asset `1f441-200d-1f5e8` while `toUnicode` asks for `1f441-fe0f-200d-1f5e8-fe0f`, see jdecked/twemoji#151)
+- With both changes, all 1915 Unicode 17.0 emoji resolve to a bundled asset
 
 # 1.2.0
 
